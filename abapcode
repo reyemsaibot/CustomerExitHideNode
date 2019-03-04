@@ -1,0 +1,64 @@
+CONSTANTS: lc_iobjnm_zrepoit TYPE rsiobjnm VALUE 'ZREPOIT',
+           lc_iobjmn_zrepoit_h TYPE c LENGTH 20 VALUE 'ZREPOIT_EBIT',
+           lc_iobjmn_zrepoit_p TYPE /bic/oizrepoit VALUE 'EBIT'.        
+
+DATA: ls_rssh_hiedir TYPE rshiedir,
+      lt_rssh_hiedir TYPE rssh_t_hiedir,
+      ls_subtreesel  TYPE rssh_s_nodebyname,
+      lt_hiestrucall TYPE /bic/whzrepoit,
+      ls_e_range     TYPE rrrangesid,
+      lv_var_range   TYPE rrrangeexit.
+      
+FIELD-SYMBOLS: <ls_hiestrucall> TYPE /bic/hzrepoit.
+
+IF i_vnam = 'ZREPOIT_CSO_01'.
+
+  IF i_step = 2.
+
+    CLEAR ls_e_range.
+    ls_e_range-opt = 'EQ'.
+    ls_e_range-sign = 'I'.
+    CALL FUNCTION 'RSSH_HIER_OF_IOBJ_GET'
+     EXPORTING
+       i_objvers                            = rs_c_objvers-active
+       i_iobjnm                             = lc_iobjnm_zrepoit
+       i_langu                              = sy-langu
+     IMPORTING
+       e_t_rshiedir                         = lt_rssh_hiedir.
+
+*   Get Hierarchie-ID for Hierarchie
+    CLEAR ls_rssh_hiedir.
+
+    READ TABLE lt_rssh_hiedir INTO ls_rssh_hiedir WITH KEY hienm = lc_iobjmn_zrepoit_h
+                                                           objvers = rs_c_objvers-active.
+
+*   Sub-Tree to Node
+    CLEAR: ls_subtreesel.
+    ls_subtreesel-iobjnm   = lc_iobjnm_zrepoit.
+    ls_subtreesel-nodename = lc_iobjmn_zrepoit_p.
+
+    CALL METHOD cl_rssh_hierarchy_func=>get
+      EXPORTING
+        i_objvers       = rs_c_objvers-active
+        i_hieid         = ls_rssh_hiedir-hieid
+        i_s_subtreesel  = ls_subtreesel
+      IMPORTING
+        e_t_hiestrucall = lt_hiestrucall.
+
+*   Get necessary nodes from hierarchy
+    LOOP AT lt_hiestrucall ASSIGNING <ls_hiestrucall>.
+      IF <ls_hiestrucall>-nodename = 'EBIT'.
+      ELSE.
+        ls_e_range-low = <ls_hiestrucall>-nodename.
+        ls_e_range-high = 'ZREPOIT'.
+        APPEND ls_e_range TO c_t_range.
+      ENDIF.
+    ENDLOOP.
+
+* Add the first Position (Sales Volume)
+    ls_e_range-low = '0001'.
+    ls_e_range-high = 'ZREPOIT'.
+    APPEND ls_e_range TO c_t_range.
+  ENDIF.
+
+ENDIF. 
